@@ -1,0 +1,772 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+# 项目开发规范和最佳实践
+
+## 📋 概述
+
+本文档整理了项目开发过程中的改进优化要点和最佳实践，作为代码生成和开发的规范指南。
+
+---
+
+## 🎯 核心原则
+
+### 1. 代码复用优先
+- ✅ 优先使用已有的公共组件和 Mixin
+- ✅ 相似功能抽取为公用方法
+- ✅ 避免重复代码，保持 DRY 原则
+- ❌ 不要在每个页面重复实现相同逻辑
+
+### 2. 简化优先
+- ✅ 能用原生组件就不自定义
+- ✅ 能用配置就不写代码
+- ✅ 保持组件和方法的简洁性
+- ❌ 避免过度设计和复杂实现
+
+### 3. 统一性原则
+- ✅ 保持交互体验统一
+- ✅ 保持代码风格统一
+- ✅ 保持命名规范统一
+- ✅ 保持错误处理统一
+
+---
+
+## 🔧 UI 组件使用规范
+
+### 确认对话框实现
+
+**❌ 不推荐：自定义对话框组件**
+```vue
+<!-- 不要这样做 -->
+<template>
+  <lls-dialog :visible.sync="dialogVisible" ...>
+    <div slot="title">...</div>
+    <div>...</div>
+    <div slot="footer">...</div>
+  </lls-dialog>
+</template>
+
+<script>
+export default {
+  data() {
+    return { dialogVisible: false }
+  },
+  methods: {
+    handleConfirm() { /* 处理逻辑 */ }
+  }
+}
+</script>
+
+<style>
+/* 大量样式代码 */
+</style>
+```
+
+**✅ 推荐：使用 MessageBox**
+```javascript
+// 这样做
+methods: {
+  handleOperation(row) {
+    this.$confirm(
+      '确认进行此操作吗？',
+      '操作确认',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    ).then(async () => {
+      await this.executeOperation(row.id);
+    }).catch(() => {
+      this.$message.info('已取消操作');
+    });
+  }
+}
+```
+
+**优势**：
+- 代码减少 90%+
+- 无需额外组件
+- 标准化 UI
+- 易于维护
+
+---
+
+## 📦 Mixin 使用规范
+
+### 数据管理页面统一使用 dataManageMixin
+
+**功能清单**：
+```javascript
+import dataManageMixin from '@/mixins/dataManageMixin';
+
+export default {
+  mixins: [dataManageMixin],
+  methods: {
+    // 只需映射 API 方法，所有逻辑由 Mixin 处理
+    getDetailApi: getYourDetail,           // 获取详情
+    adjustApi: adjustYourData,             // 数据调整
+    regenerateApi: regenerateYourData,     // 重新生成
+    batchRegenerateApi: batchRegenerateYourData,  // 批量重新生成
+    batchReportApi: batchReportYourData,   // 批量报送
+    getLogsApi: getYourLogs,               // 获取日志
+    exportApi: exportYourData              // 导出数据
+  }
+}
+```
+
+**Mixin 自动提供的功能**：
+- ✅ 确认对话框（使用 MessageBox）
+- ✅ 错误处理
+- ✅ 成功/失败提示
+- ✅ 自动刷新表格
+- ✅ 统一的交互体验
+
+---
+
+## 💬 提示文案规范
+
+### 确认操作提示
+
+| 操作类型 | 标题 | 提示内容 |
+|---------|------|---------|
+| **重新生成** | 重新生成 | 是否重新生成？重新生成之后，原来的数据将被更新。 |
+| **批量重新生成** | 批量重新生成 | 最近针对报送规则进行了更新，是否需批量重新生成？重新生成之后，需要的数据将会被更新。 |
+| **数据报送** | 数据报送 | 确认进行数据报送吗？ |
+| **批量报送** | 批量数据报送 | 是否进行数据报送? |
+| **删除操作** | 删除确认 | 确认删除此数据？删除后将无法恢复。 |
+
+### 操作结果提示
+
+```javascript
+// 成功提示
+this.$message.success('操作成功');
+this.$message.success('批量重新生成成功');
+
+// 失败提示
+this.$message.error('操作失败');
+this.$message.error(response?.message || '操作失败');
+
+// 取消提示
+this.$message.info('已取消操作');
+this.$message.info('已取消批量重新生成');
+```
+
+---
+
+## 🗂️ 代码组织规范
+
+### 页面文件结构
+
+```
+src/views/yourModule/
+├── index.vue           # 列表页面
+├── config.js           # 表格和表单配置
+├── api.js             # API 接口定义
+├── detail.vue         # 明细页面（如有）
+├── detailConfig.js    # 明细配置（如有）
+└── detailApi.js       # 明细 API（如有）
+```
+
+### 页面组件结构
+
+```vue
+<template>
+  <div class="your-page data-manage-wrapper">
+    <!-- 数据表格 -->
+    <data-manage-table
+      ref="dataTable"
+      :config="tableConfig"
+      :fetch-data="fetchTableData"
+      @action="handleAction"
+    ></data-manage-table>
+
+    <!-- 数据调整弹窗 -->
+    <data-adjust-dialog
+      :visible.sync="adjustDialogVisible"
+      :config="adjustFormConfig"
+      :data="currentRowData"
+      @close="handleCloseAdjustDialog"
+      @submit="handleAdjustSubmit"
+    ></data-adjust-dialog>
+
+    <!-- 查看日志弹窗 -->
+    <view-log-dialog
+      :visible.sync="logDialogVisible"
+      :log-data="logData"
+      @close="handleCloseLogDialog"
+    ></view-log-dialog>
+  </div>
+</template>
+
+<script>
+import DataManageTable from '@/components/DataManageTable.vue';
+import DataAdjustDialog from '@/components/DataAdjustDialog.vue';
+import ViewLogDialog from '@/components/ViewLogDialog.vue';
+import dataManageMixin from '@/mixins/dataManageMixin';
+import { tableConfig, adjustFormConfig } from './config';
+import { getYourList, /* 其他 API */ } from './api';
+
+export default {
+  name: 'YourPage',
+  mixins: [dataManageMixin],
+  components: {
+    DataManageTable,
+    DataAdjustDialog,
+    ViewLogDialog
+  },
+  data() {
+    return {
+      tableConfig,
+      adjustFormConfig
+    };
+  },
+  methods: {
+    async fetchTableData(params) {
+      return await getYourList(params);
+    },
+
+    // API 方法映射
+    getDetailApi: getYourDetail,
+    adjustApi: adjustYourData,
+    regenerateApi: regenerateYourData,
+    batchRegenerateApi: batchRegenerateYourData,
+    batchReportApi: batchReportYourData,
+    getLogsApi: getYourLogs,
+    exportApi: exportYourData
+  }
+};
+</script>
+
+<style lang="scss" scoped>
+// 页面特定样式
+</style>
+```
+
+---
+
+## 🔌 API 定义规范
+
+### API 文件结构
+
+```javascript
+/**
+ * 模块名称 - API 接口
+ */
+import http from '@/api/http';
+
+// ==================== Mock 配置 ====================
+const MOCK_ENABLED = process.env.NODE_ENV === 'development';
+
+// Mock 数据定义
+const mockData = { /* ... */ };
+
+// Mock 响应函数
+function mockResponse(data) {
+  return Promise.resolve({
+    code: 200,
+    message: '操作成功',
+    data: data
+  });
+}
+
+// ==================== API 接口 ====================
+
+/**
+ * 获取列表
+ * @param {Object} params - 查询参数
+ * @returns {Promise}
+ */
+export function getYourList(params) {
+  if (MOCK_ENABLED) {
+    return mockResponse({ list: mockData, total: mockData.length });
+  }
+  return http.get('/your-module/list', { params });
+}
+
+/**
+ * 获取详情
+ * @param {string|number} id - 记录ID
+ * @returns {Promise}
+ */
+export function getYourDetail(id) {
+  if (MOCK_ENABLED) {
+    return mockResponse(mockData[0]);
+  }
+  return http.get(`/your-module/detail/${id}`);
+}
+
+/**
+ * 批量重新生成数据
+ * @param {string|number} id - 记录ID
+ * @returns {Promise}
+ */
+export function batchRegenerateYourData(id) {
+  if (MOCK_ENABLED) {
+    return mockResponse({ success: true });
+  }
+  return http.post(`/your-module/batch-regenerate/${id}`);
+}
+
+/**
+ * 批量报送数据
+ * @param {string|number} id - 记录ID
+ * @returns {Promise}
+ */
+export function batchReportYourData(id) {
+  if (MOCK_ENABLED) {
+    return mockResponse({ success: true });
+  }
+  return http.post(`/your-module/batch-report/${id}`);
+}
+```
+
+### API 命名规范
+
+| 操作类型 | 命名格式 | 示例 |
+|---------|---------|------|
+| 获取列表 | `get{Module}List` | `getFinancingInfoList` |
+| 获取详情 | `get{Module}Detail` | `getFinancingInfoDetail` |
+| 数据调整 | `adjust{Module}Data` | `adjustFinancingInfoData` |
+| 重新生成 | `regenerate{Module}Data` | `regenerateFinancingInfoData` |
+| 批量重新生成 | `batchRegenerate{Module}Data` | `batchRegenerateFinancingInfoData` |
+| 批量报送 | `batchReport{Module}Data` | `batchReportFinancingInfoData` |
+| 获取日志 | `get{Module}Logs` | `getFinancingInfoLogs` |
+| 导出数据 | `export{Module}Data` | `exportFinancingInfoData` |
+
+---
+
+## 📝 配置文件规范
+
+### 表格配置
+
+```javascript
+export const tableConfig = {
+  title: '页面标题',
+  isShowExport: true, // 是否显示导出按钮
+  
+  // 搜索字段配置
+  searchFields: [
+    {
+      key: 'businessElement',
+      type: 'select',
+      placeholder: '业务要素',
+      defaultValue: '',
+      options: [
+        { label: '试用', value: 'trial' },
+        { label: '正式', value: 'formal' }
+      ]
+    },
+    {
+      key: 'dataDate',
+      type: 'month',
+      placeholder: '数据日期',
+      format: 'yyyy年MM月',
+      valueFormat: 'yyyyMM'
+    }
+  ],
+  
+  // 表格列配置
+  columns: [
+    { 
+      prop: 'businessElement', 
+      label: '业务要素', 
+      width: 120, 
+      align: 'center' 
+    },
+    { 
+      prop: 'dataDate', 
+      label: '数据日期', 
+      minWidth: 120, 
+      align: 'center' 
+    }
+  ],
+  
+  // 操作列配置
+  showActions: true,
+  actionWidth: 200,
+  actions: [
+    { key: 'reportDetail', label: '报送明细', type: 'text' },
+    { key: 'export', label: '导出', type: 'text' },
+    { key: 'batchRegenerate', label: '批量重新生成', dropdown: true },
+    { key: 'batchReport', label: '批量报送', dropdown: true }
+  ]
+};
+```
+
+---
+
+## ✅ 错误处理规范
+
+### 统一的错误处理模式
+
+```javascript
+async executeOperation(id) {
+  // 1. 检查 API 是否定义
+  if (!this.operationApi) {
+    console.error('未定义 operationApi 方法');
+    this.$message.error('未定义操作接口');
+    return;
+  }
+
+  try {
+    // 2. 调用 API
+    const response = await this.operationApi(id);
+    
+    // 3. 检查响应
+    if (response && response.code === 200) {
+      this.$message.success('操作成功');
+      this.$refs.dataTable?.refresh();
+    } else {
+      // 显示后端返回的错误信息
+      this.$message.error(response?.message || '操作失败');
+    }
+  } catch (error) {
+    // 4. 捕获异常
+    console.error('操作失败:', error);
+    this.$message.error('操作失败');
+  }
+}
+```
+
+---
+
+## 📚 注释规范
+
+### 方法注释
+
+```javascript
+/**
+ * 方法描述
+ * @param {string|number} id - 参数说明
+ * @param {Object} data - 数据对象
+ * @param {string} data.name - 对象属性说明
+ * @returns {Promise<Object>} 返回值说明
+ */
+async methodName(id, data) {
+  // 实现代码
+}
+```
+
+### 配置注释
+
+```javascript
+export const config = {
+  // 字段说明
+  fieldName: 'value',
+  
+  // 复杂配置的说明
+  complexField: {
+    // 详细说明
+    subField: 'value'
+  }
+};
+```
+
+---
+
+## 🎨 样式规范
+
+### 样式组织
+
+```vue
+<style lang="scss" scoped>
+// 1. 页面容器样式
+.your-page {
+  // 容器样式
+}
+
+// 2. 组件样式
+.your-component {
+  // 组件样式
+}
+
+// 3. 深度选择器使用
+::v-deep .lls-dialog__header {
+  padding: 16px 20px;
+}
+
+// 4. 响应式样式
+@media screen and (max-width: 768px) {
+  .your-page {
+    // 移动端样式
+  }
+}
+</style>
+```
+
+### 避免内联样式
+
+❌ 不推荐：
+```vue
+<div style="margin-top: 20px; color: red;">...</div>
+```
+
+✅ 推荐：
+```vue
+<div class="error-message">...</div>
+
+<style scoped>
+.error-message {
+  margin-top: 20px;
+  color: #ff4d4f;
+}
+</style>
+```
+
+---
+
+## 🧪 开发测试规范
+
+### Mock 数据要求
+
+1. **开发环境默认启用 Mock**
+```javascript
+const MOCK_ENABLED = process.env.NODE_ENV === 'development';
+```
+
+2. **Mock 数据完整性**
+```javascript
+const mockData = {
+  id: 1,
+  name: '测试数据',
+  status: 'active',
+  createTime: '2025-01-01 10:00:00',
+  // 包含所有必要字段
+};
+```
+
+3. **Mock 数据多样性**
+```javascript
+const mockList = [
+  { id: 1, status: 'pending' },
+  { id: 2, status: 'processing' },
+  { id: 3, status: 'completed' },
+  { id: 4, status: 'failed' }
+];
+```
+
+---
+
+## 📦 组件开发规范
+
+### 组件职责单一
+
+❌ 不推荐：一个组件做太多事
+```vue
+<!-- 功能过于复杂的组件 -->
+<big-component>
+  <!-- 表格 + 表单 + 对话框 + 逻辑处理 -->
+</big-component>
+```
+
+✅ 推荐：拆分为多个组件
+```vue
+<data-table />
+<data-form />
+<data-dialog />
+```
+
+### 组件 Props 定义
+
+```javascript
+props: {
+  // 必需的 prop
+  value: {
+    type: String,
+    required: true
+  },
+  
+  // 可选的 prop 带默认值
+  size: {
+    type: String,
+    default: 'medium',
+    validator: (value) => ['small', 'medium', 'large'].includes(value)
+  },
+  
+  // 对象类型使用工厂函数
+  config: {
+    type: Object,
+    default: () => ({})
+  }
+}
+```
+
+---
+
+## 🚀 性能优化规范
+
+### 1. 避免不必要的组件引入
+
+❌ 不推荐：
+```javascript
+import BigLibrary from 'big-library'; // 引入整个库
+```
+
+✅ 推荐：
+```javascript
+import { specificFunction } from 'big-library'; // 按需引入
+```
+
+### 2. 列表渲染优化
+
+```vue
+<!-- 使用 key -->
+<div v-for="item in list" :key="item.id">
+  {{ item.name }}
+</div>
+
+<!-- 避免 v-if 和 v-for 同时使用 -->
+<!-- ❌ 不推荐 -->
+<div v-for="item in list" v-if="item.active" :key="item.id">
+
+<!-- ✅ 推荐 -->
+<div v-for="item in activeList" :key="item.id">
+```
+
+### 3. 计算属性缓存
+
+```javascript
+computed: {
+  // 使用计算属性代替方法
+  filteredList() {
+    return this.list.filter(item => item.active);
+  }
+}
+```
+
+---
+
+## 📋 Git 提交规范
+
+### Commit Message 格式
+
+```
+<type>(<scope>): <subject>
+
+<body>
+
+<footer>
+```
+
+### Type 类型
+
+- `feat`: 新功能
+- `fix`: 修复 bug
+- `docs`: 文档更新
+- `style`: 代码格式调整
+- `refactor`: 重构代码
+- `perf`: 性能优化
+- `test`: 测试相关
+- `chore`: 构建/工具链相关
+
+### 示例
+
+```
+feat(financingInfo): 使用 MessageBox 优化批量操作功能
+
+- 移除自定义对话框组件
+- 统一使用 Link UI 的 MessageBox
+- 代码量减少 90%+
+- 提升用户体验一致性
+
+Closes #123
+```
+
+---
+
+## 🔍 代码审查清单
+
+### 提交前检查
+
+- [ ] 代码格式化完成（Prettier/ESLint）
+- [ ] 无 Linter 错误
+- [ ] 无 console.log 调试代码
+- [ ] 注释完整且准确
+- [ ] Mock 数据完整
+- [ ] 错误处理完善
+- [ ] 变量命名规范
+- [ ] 无重复代码
+- [ ] 组件引入最少化
+- [ ] 测试通过
+
+---
+
+## 📖 文档规范
+
+### 新功能必须包含文档
+
+每个新功能或重要优化都应该包含：
+
+1. **使用指南**：如何使用该功能
+2. **API 文档**：接口说明
+3. **示例代码**：完整的代码示例
+4. **注意事项**：常见问题和注意点
+5. **变更日志**：版本更新记录
+
+### 文档位置
+
+```
+docs/
+├── README.md                    # 项目总览
+├── DEVELOPMENT_RULES.md         # 开发规范（本文档）
+├── BATCH_OPERATIONS_MESSAGEBOX_GUIDE.md  # 功能文档
+└── DOCS_INDEX.md                # 文档索引
+```
+
+---
+
+## 🎯 最佳实践总结
+
+### DO（应该做的）
+
+✅ 使用 Link UI 原生组件（MessageBox、Message 等）  
+✅ 功能抽取到 Mixin 中复用  
+✅ 保持代码简洁和可读性  
+✅ 统一的错误处理和提示  
+✅ 完整的注释和文档  
+✅ 支持 Mock 数据开发  
+✅ 规范的命名和组织  
+✅ 性能优化考虑  
+
+### DON'T（不应该做的）
+
+❌ 不要创建不必要的自定义组件  
+❌ 不要重复实现相同功能  
+❌ 不要忽略错误处理  
+❌ 不要写过长的方法（>50 行）  
+❌ 不要过度嵌套（>3 层）  
+❌ 不要硬编码配置  
+❌ 不要省略 key 属性  
+❌ 不要忽视代码注释  
+
+---
+
+## 🔄 持续改进
+
+本规范文档会根据项目实践持续更新和完善。
+
+### 更新日志
+
+- **2025-10-16**: v1.0.0 初始版本，整合批量操作优化经验
+  - MessageBox 使用规范
+  - Mixin 使用规范
+  - 代码组织规范
+  - 提示文案规范
+
+### 反馈和建议
+
+如发现规范中的问题或有改进建议，请：
+1. 提交 Issue
+2. 发起讨论
+3. 提交 PR
+
+---
+
+**文档维护**: 开发团队  
+**最后更新**: 2025-10-16  
+**版本**: v1.0.0
+
+
